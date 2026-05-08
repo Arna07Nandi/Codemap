@@ -52,7 +52,10 @@ const loadMermaid = () => {
     script.src = 'https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js';
     script.onload = () => {
       window.mermaid.initialize({
-        startOnLoad: false, theme: 'base', securityLevel: 'loose',
+        startOnLoad: false, 
+        theme: 'base', 
+        securityLevel: 'loose',
+        useMaxWidth: false, // THE FIX: Prevents tiny squished maps on initial load
         flowchart: { htmlLabels: true, curve: 'basis', padding: 20, nodeSpacing: 60, rankSpacing: 70 }
       });
       resolve(window.mermaid);
@@ -395,7 +398,7 @@ function MainApp() {
     finally { setIsRefactoring(false); }
   };
 
-  // The Bulletproof Exporter
+  // The Bulletproof, High-Res Exporter
   const exportMap = (type) => {
     setExportMenuOpen(false);
     if (!mapContentRef.current) return;
@@ -440,11 +443,19 @@ function MainApp() {
     
     img.onload = () => {
       try {
-        const cvs = document.createElement('canvas'); const ctx = cvs.getContext('2d');
-        cvs.width = bbox.width * 2; cvs.height = bbox.height * 2;
+        // THE HIGH-RES FIX: Multiplies canvas scale by 3 for crystal clear PNGs!
+        const scale = 3; 
+        const cvs = document.createElement('canvas'); 
+        const ctx = cvs.getContext('2d');
+        
+        cvs.width = bbox.width * scale; 
+        cvs.height = bbox.height * scale;
+        
         ctx.fillStyle = isDarkMode ? "#0f172a" : "#f8fafc"; 
         ctx.fillRect(0, 0, cvs.width, cvs.height);
-        ctx.scale(2, 2); ctx.drawImage(img, 0, 0); 
+        
+        ctx.scale(scale, scale); 
+        ctx.drawImage(img, 0, 0); 
         
         const pngData = cvs.toDataURL('image/png'); 
         triggerDownload(pngData, 'architecture.png');
@@ -721,7 +732,7 @@ class ErrorBoundary extends React.Component {
 }
 
 export default function App() {
-  // Completely pristine. No ClerkProvider. No crashing.
+  // CLEAN AND CRASH-FREE
   return (
     <ErrorBoundary>
       <Analytics />
