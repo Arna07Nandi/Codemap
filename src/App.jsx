@@ -55,8 +55,9 @@ const loadMermaid = () => {
         startOnLoad: false, 
         theme: 'base', 
         securityLevel: 'loose',
-        useMaxWidth: false, // Prevents tiny squished maps on load
-        flowchart: { htmlLabels: true, curve: 'basis', padding: 20, nodeSpacing: 60, rankSpacing: 70 }
+        useMaxWidth: false, 
+        // UPGRADED SPACING & CURVES FOR ORGANIC LOOK
+        flowchart: { htmlLabels: true, curve: 'basis', padding: 30, nodeSpacing: 80, rankSpacing: 100 }
       });
       resolve(window.mermaid);
     };
@@ -65,14 +66,15 @@ const loadMermaid = () => {
   });
 };
 
+// UPGRADED EXPORT STYLES FOR PREMIUM FOCUS MODE
 const EXPORT_STYLES = `
-  .node-card { padding: 8px; width: 220px; text-align: left; font-family: Inter, sans-serif; white-space: normal; }
-  .node-head { border-bottom: 1px solid rgba(148, 163, 184, 0.3); padding-bottom: 6px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: flex-start; }
-  .node-title { font-weight: 700; font-size: 13px; word-break: break-word; line-height: 1.2; }
-  .node-badge { font-size: 9px; font-weight: 700; padding: 2px 5px; border-radius: 8px; white-space: nowrap; margin-left: 6px; }
-  .node-badge.cmplx { background: #fee2e2; color: #ef4444; } 
-  .node-badge.clean { background: #d1fae5; color: #10b981; }
-  .node-info { font-size: 10px; margin-bottom: 4px; line-height: 1.3; }
+  .node-card { padding: 12px 16px; min-width: 160px; max-width: 260px; text-align: left; font-family: Inter, sans-serif; white-space: normal; display: flex; flex-direction: column; gap: 6px; }
+  .node-title-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .node-title { font-weight: 700; font-size: 14px; line-height: 1.2; word-break: break-word; }
+  .node-badge { font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 12px; white-space: nowrap; }
+  .node-badge.cmplx { background: #fee2e2; color: #ef4444; border: 1px solid #fca5a5; } 
+  .node-badge.clean { background: #d1fae5; color: #10b981; border: 1px solid #6ee7b7; }
+  .node-hint { font-size: 11px; font-weight: 600; opacity: 0.5; display: flex; align-items: center; margin-top: 2px; }
   foreignObject { overflow: visible !important; }
 `;
 
@@ -291,12 +293,10 @@ function MainApp() {
       data.nodes.filter(n => (n.file || 'Unknown') === file).forEach(node => {
         const isCmplx = (node.complexity || 1) > 7;
         
-        let html = `<div xmlns='http://www.w3.org/1999/xhtml' class='node-card' style='background-color:${nodeBg}; color:${nodeText}; border-radius: 8px;'>`;
-        html += `<div class='node-head'><span class='node-title'>${sanitizeHtml(node.label)}</span><span class='node-badge ${isCmplx ? 'cmplx' : 'clean'}'>C: ${node.complexity || 1}</span></div>`;
-        if (node.description) html += `<div class='node-info'>⚡ <b>Action:</b> ${sanitizeHtml(node.description)}</div>`;
-        if (node.ui_design) html += `<div class='node-info' style='color:#3b82f6;'>🎨 <b>Design:</b> ${sanitizeHtml(node.ui_design)}</div>`;
-        if (node.returns) html += `<div class='node-info' style='color:#8b5cf6;'>↩️ <b>Yields:</b> ${sanitizeHtml(node.returns)}</div>`;
-        if (node.userComment) html += `<div class='node-info' style='color:#ec4899; margin-top:4px; padding-top:4px; border-top:1px dashed rgba(148,163,184,0.3);'>💬 ${sanitizeHtml(node.userComment)}</div>`;
+        // FOCUS MODE: MINIMAL CLEAN HTML INJECTION
+        let html = `<div xmlns='http://www.w3.org/1999/xhtml' class='node-card' style='background-color:${nodeBg}; color:${nodeText}; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border: 1px solid ${isDarkMode ? '#334155' : '#e2e8f0'};'>`;
+        html += `<div class='node-title-row'><span class='node-title'>${sanitizeHtml(node.label)}</span><span class='node-badge ${isCmplx ? 'cmplx' : 'clean'}'>C: ${node.complexity || 1}</span></div>`;
+        if (node.description || node.returns || node.ui_design) { html += `<div class='node-hint'>🔍 Click to inspect logic</div>`; }
         html += `</div>`;
         
         m += `    ${makeSafeId(node.id)}("${html}"):::${isCmplx ? 'complexNode' : 'cleanNode'}\n`;
@@ -329,11 +329,10 @@ function MainApp() {
         
         mapContentRef.current.innerHTML = svg;
         
-        // UNRESTRICTED MAP SIZE FIX
+        // UNRESTRICTED MAP SIZE FIX (NO WIDTH REMOVAL)
         const renderedSvg = mapContentRef.current.querySelector('svg');
         if (renderedSvg) {
           renderedSvg.style.maxWidth = 'none';
-          // Width attribute remains untouched so the map renders massively on screen.
         }
 
         mapContentRef.current.querySelectorAll('.node').forEach(n => {
@@ -515,7 +514,7 @@ function MainApp() {
       <div className="flex flex-1 overflow-hidden relative">
         <div className={`flex-1 relative overflow-hidden transition-colors duration-300 ${isDarkMode ? 'bg-slate-950' : 'bg-slate-50'}`} onWheel={e => setTransform(p => ({ ...p, scale: Math.max(0.1, p.scale - e.deltaY * 0.001) }))} onMouseDown={e => { setIsDragging(true); setDragStart({ x: e.clientX - transform.x, y: e.clientY - transform.y }); }} onMouseMove={e => isDragging && setTransform(p => ({ ...p, x: e.clientX - dragStart.x, y: e.clientY - dragStart.y }))} onMouseUp={() => setIsDragging(false)} onMouseLeave={() => setIsDragging(false)}>
           
-          {/* THE MOBILE SCROLL FIX IS HERE */}
+          {/* MOBILE SCROLL FIX PRESERVED */}
           {status === 'idle' && (
             <div className={`absolute inset-0 z-10 flex flex-col items-center p-4 sm:p-6 lg:p-8 overflow-y-auto custom-scroll sm:justify-center ${isDarkMode ? 'bg-slate-950/90' : 'bg-slate-50/90'} backdrop-blur-sm`}>
               <div className={`w-full max-w-2xl rounded-2xl md:rounded-[2rem] shadow-2xl border overflow-hidden shrink-0 mt-8 mb-16 sm:my-auto ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
@@ -608,7 +607,7 @@ function MainApp() {
           </div>
         </div>
 
-        {/* Floating Sidebar - Node Details */}
+        {/* Floating Sidebar - Node Details (Focus Panel) */}
         <div className={`absolute right-0 top-0 bottom-0 w-full sm:w-80 md:w-96 border-l shadow-2xl z-20 transition-transform duration-300 flex flex-col ${selectedNodeId ? 'translate-x-0' : 'translate-x-full'} ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
           {selectedNode && (
             <>
