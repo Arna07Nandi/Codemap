@@ -514,10 +514,10 @@ function MainApp() {
       <div className="flex flex-1 overflow-hidden relative">
         <div className={`flex-1 relative overflow-hidden transition-colors duration-300 ${isDarkMode ? 'bg-slate-950' : 'bg-slate-50'}`} onWheel={e => setTransform(p => ({ ...p, scale: Math.max(0.1, p.scale - e.deltaY * 0.001) }))} onMouseDown={e => { setIsDragging(true); setDragStart({ x: e.clientX - transform.x, y: e.clientY - transform.y }); }} onMouseMove={e => isDragging && setTransform(p => ({ ...p, x: e.clientX - dragStart.x, y: e.clientY - dragStart.y }))} onMouseUp={() => setIsDragging(false)} onMouseLeave={() => setIsDragging(false)}>
           
-          {/* MOBILE SCROLL FIX PRESERVED */}
+          {/* THE FLEXBOX OVERFLOW FIX */}
           {status === 'idle' && (
-            <div className={`absolute inset-0 z-10 flex flex-col items-center p-4 sm:p-6 lg:p-8 overflow-y-auto custom-scroll sm:justify-center ${isDarkMode ? 'bg-slate-950/90' : 'bg-slate-50/90'} backdrop-blur-sm`}>
-              <div className={`w-full max-w-2xl rounded-2xl md:rounded-[2rem] shadow-2xl border overflow-hidden shrink-0 mt-8 mb-16 sm:my-auto ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
+            <div className={`absolute inset-0 z-10 overflow-y-auto custom-scroll p-4 sm:p-6 lg:p-8 ${isDarkMode ? 'bg-slate-950/90' : 'bg-slate-50/90'} backdrop-blur-sm`}>
+              <div className={`w-full max-w-2xl mx-auto mt-4 mb-24 sm:mt-12 lg:mt-20 rounded-2xl md:rounded-[2rem] shadow-2xl border overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
                 <div className={`flex border-b ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
                   <button className={`flex-1 py-4 md:py-5 text-[10px] md:text-xs font-bold uppercase tracking-widest ${inputMode === 'url' ? (isDarkMode ? 'bg-slate-900 shadow-sm text-white' : 'bg-white shadow-sm text-slate-900') : 'text-slate-500'}`} onClick={() => setInputMode('url')}><Link size={14} className="inline mr-1" /> Web Links</button>
                   <button className={`flex-1 py-4 md:py-5 text-[10px] md:text-xs font-bold uppercase tracking-widest ${inputMode === 'local' ? (isDarkMode ? 'bg-slate-900 shadow-sm text-white' : 'bg-white shadow-sm text-slate-900') : 'text-slate-500'}`} onClick={() => setInputMode('local')}><Code size={14} className="inline mr-1" /> Local Snippets</button>
