@@ -56,7 +56,6 @@ const loadMermaid = () => {
         theme: 'base', 
         securityLevel: 'loose',
         useMaxWidth: false, 
-        // UPGRADED SPACING & CURVES FOR ORGANIC LOOK
         flowchart: { htmlLabels: true, curve: 'basis', padding: 30, nodeSpacing: 80, rankSpacing: 100 }
       });
       resolve(window.mermaid);
@@ -66,7 +65,6 @@ const loadMermaid = () => {
   });
 };
 
-// UPGRADED EXPORT STYLES FOR PREMIUM FOCUS MODE
 const EXPORT_STYLES = `
   .node-card { padding: 12px 16px; min-width: 160px; max-width: 260px; text-align: left; font-family: Inter, sans-serif; white-space: normal; display: flex; flex-direction: column; gap: 6px; }
   .node-title-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
@@ -106,7 +104,7 @@ function MainApp() {
 
   const [inputMode, setInputMode] = useState('url');
   const [urlInput, setUrlInput] = useState('');
-  const [localFiles, setLocalFiles] = useState([{ id: 1, name: 'snippet.js', content: '' }]);
+  const [localFiles, setLocalFiles] = useState([{ id: 1, name: '', content: '' }]);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [inputError, setInputError] = useState('');
 
@@ -140,7 +138,7 @@ function MainApp() {
 
   const saveToHistory = () => {
     if (!architecture || !mermaidCode) return;
-    const title = inputMode === 'url' ? urlInput.split('/').pop() || 'Map' : 'Local Code Snippets';
+    const title = inputMode === 'url' ? urlInput.split('/').pop() || (appMode === 'developer' ? 'Local Code Snippets' : 'Local Notes') : (appMode === 'developer' ? 'Local Code Snippets' : 'Local Notes');
     const newItem = { id: Date.now().toString(), title, createdAt: Date.now(), architecture, mermaidCode };
     setLocalHistory(prev => [newItem, ...prev]);
     showToast("Map saved to Vault!", "success");
@@ -242,13 +240,13 @@ function MainApp() {
         }
       } else {
         const validFiles = localFiles.filter(f => f.content.trim());
-        if (!validFiles.length) return setInputError("Payload empty. Provide local snippets.");
-        fileContents = validFiles.map(f => ({ path: f.name || 'snippet', content: f.content }));
+        if (!validFiles.length) return setInputError("Payload empty. Provide local input.");
+        fileContents = validFiles.map(f => ({ path: f.name || (appMode === 'developer' ? 'snippet' : 'note'), content: f.content }));
       }
 
       setErrorData(null); setArchitecture(null); setMermaidCode(''); setSelectedNodeId(null); setTransform({ x: 0, y: 0, scale: 1 });
       setStatus('analyzing');
-      setStatusMessage('AI is constructing the architecture map...');
+      setStatusMessage('AI is constructing the map...');
 
       // DYNAMIC AI BRAIN SWAP
       const devPrompt = `Analyze these source files/text. Extract core architecture: classes, functions, relationships.
@@ -302,7 +300,6 @@ function MainApp() {
       data.nodes.filter(n => (n.file || 'Unknown') === file).forEach(node => {
         const isCmplx = (node.complexity || 1) > 7;
         
-        // FOCUS MODE: MINIMAL CLEAN HTML INJECTION
         let html = `<div xmlns='http://www.w3.org/1999/xhtml' class='node-card' style='background-color:${nodeBg}; color:${nodeText}; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border: 1px solid ${isDarkMode ? '#334155' : '#e2e8f0'};'>`;
         html += `<div class='node-title-row'><span class='node-title'>${sanitizeHtml(node.label)}</span><span class='node-badge ${isCmplx ? 'cmplx' : 'clean'}'>C: ${node.complexity || 1}</span></div>`;
         if (node.description || node.returns || node.ui_design) { html += `<div class='node-hint'>🔍 Click to inspect logic</div>`; }
@@ -338,7 +335,6 @@ function MainApp() {
         
         mapContentRef.current.innerHTML = svg;
         
-        // UNRESTRICTED MAP SIZE FIX (NO WIDTH REMOVAL)
         const renderedSvg = mapContentRef.current.querySelector('svg');
         if (renderedSvg) {
           renderedSvg.style.maxWidth = 'none';
@@ -373,14 +369,19 @@ function MainApp() {
     if (!node?.code_snippet) return;
     setIsRefactoring(true); setRefactorSuggestion(null);
     try {
+      // DYNAMIC ACTION BUTTON PROMPT
+      const actionPrompt = appMode === 'developer' 
+        ? `Refactor this code to reduce complexity.\nCode:\n${node.code_snippet}`
+        : `Elaborate and explain this concept in more detail.\nText:\n${node.code_snippet}`;
+
       const aiResponse = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: `Refactor this code to reduce complexity.\nCode:\n${node.code_snippet}` })
+        body: JSON.stringify({ prompt: actionPrompt })
       });
       const data = await aiResponse.json();
       setRefactorSuggestion(data.candidates[0].content.parts[0].text);
-    } catch { setRefactorSuggestion("Refactor failed. Backend unreachable."); } 
+    } catch { setRefactorSuggestion("Operation failed. Backend unreachable."); } 
     finally { setIsRefactoring(false); }
   };
 
@@ -397,14 +398,14 @@ function MainApp() {
     };
 
     if (type === 'md') {
-      let md = `# Architecture Map\n\n\`\`\`mermaid\n${mermaidCode}\n\`\`\`\n\n## Node Details\n\n`;
+      let md = `# Map Export\n\n\`\`\`mermaid\n${mermaidCode}\n\`\`\`\n\n## Node Details\n\n`;
       architecture?.nodes.forEach(n => {
         md += `### ${n.label}\n- **File:** \`${n.file}\`\n- **Complexity:** ${n.complexity}\n`;
         if (n.description) md += `- **Action:** ${n.description}\n`;
         if (n.returns) md += `- **Returns:** ${n.returns}\n`;
         md += `\n`;
       });
-      return triggerDownload("data:text/markdown;charset=utf-8," + encodeURIComponent(md), 'architecture.md');
+      return triggerDownload("data:text/markdown;charset=utf-8," + encodeURIComponent(md), 'map_export.md');
     }
 
     const svgEl = mapContentRef.current.querySelector('svg');
@@ -414,7 +415,6 @@ function MainApp() {
     const style = document.createElement('style'); style.textContent = EXPORT_STYLES;
     cloned.insertBefore(style, cloned.firstChild);
     
-    // 4K HIGH RES FIX: Extract true viewBox dimensions
     const viewBox = svgEl.getAttribute('viewBox');
     let baseWidth = 1200, baseHeight = 800;
     
@@ -433,14 +433,14 @@ function MainApp() {
     const svgData = new XMLSerializer().serializeToString(cloned);
     const svgUrl = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgData);
     
-    if (type === 'svg') return triggerDownload(svgUrl, 'architecture.svg');
+    if (type === 'svg') return triggerDownload(svgUrl, 'map_export.svg');
     
     showToast("Compiling 4K High-Res PNG...", 'info');
     const img = new Image(); 
     
     img.onload = () => {
       try {
-        const scale = 4; // 4X QUALITY MULTIPLIER
+        const scale = 4;
         const cvs = document.createElement('canvas'); 
         const ctx = cvs.getContext('2d');
         
@@ -454,14 +454,14 @@ function MainApp() {
         ctx.drawImage(img, 0, 0); 
         
         const pngData = cvs.toDataURL('image/png'); 
-        triggerDownload(pngData, 'architecture.png');
+        triggerDownload(pngData, 'map_export.png');
       } catch (err) {
         showToast("Mobile browser blocked PNG export. Downloading high-res SVG instead.", 'warning');
-        triggerDownload(svgUrl, 'architecture.svg');
+        triggerDownload(svgUrl, 'map_export.svg');
       }
     };
     
-    img.onerror = () => { triggerDownload(svgUrl, 'architecture.svg'); };
+    img.onerror = () => { triggerDownload(svgUrl, 'map_export.svg'); };
     img.src = svgUrl;
   };
 
@@ -529,13 +529,17 @@ function MainApp() {
       <div className="flex flex-1 overflow-hidden relative">
         <div className={`flex-1 relative overflow-hidden transition-colors duration-300 ${isDarkMode ? 'bg-slate-950' : 'bg-slate-50'}`} onWheel={e => setTransform(p => ({ ...p, scale: Math.max(0.1, p.scale - e.deltaY * 0.001) }))} onMouseDown={e => { setIsDragging(true); setDragStart({ x: e.clientX - transform.x, y: e.clientY - transform.y }); }} onMouseMove={e => isDragging && setTransform(p => ({ ...p, x: e.clientX - dragStart.x, y: e.clientY - dragStart.y }))} onMouseUp={() => setIsDragging(false)} onMouseLeave={() => setIsDragging(false)}>
           
-          {/* THE FLEXBOX OVERFLOW FIX */}
           {status === 'idle' && (
             <div className={`absolute inset-0 z-10 overflow-y-auto custom-scroll p-4 sm:p-6 lg:p-8 ${isDarkMode ? 'bg-slate-950/90' : 'bg-slate-50/90'} backdrop-blur-sm`}>
               <div className={`w-full max-w-2xl mx-auto mt-4 mb-24 sm:mt-12 lg:mt-20 rounded-2xl md:rounded-[2rem] shadow-2xl border overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
                 <div className={`flex border-b ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
                   <button className={`flex-1 py-4 md:py-5 text-[10px] md:text-xs font-bold uppercase tracking-widest ${inputMode === 'url' ? (isDarkMode ? 'bg-slate-900 shadow-sm text-white' : 'bg-white shadow-sm text-slate-900') : 'text-slate-500'}`} onClick={() => setInputMode('url')}><Link size={14} className="inline mr-1" /> Web Links</button>
-                  <button className={`flex-1 py-4 md:py-5 text-[10px] md:text-xs font-bold uppercase tracking-widest ${inputMode === 'local' ? (isDarkMode ? 'bg-slate-900 shadow-sm text-white' : 'bg-white shadow-sm text-slate-900') : 'text-slate-500'}`} onClick={() => setInputMode('local')}><Code size={14} className="inline mr-1" /> Local Snippets</button>
+                  
+                  {/* DYNAMIC TAB NAME */}
+                  <button className={`flex-1 py-4 md:py-5 text-[10px] md:text-xs font-bold uppercase tracking-widest ${inputMode === 'local' ? (isDarkMode ? 'bg-slate-900 shadow-sm text-white' : 'bg-white shadow-sm text-slate-900') : 'text-slate-500'}`} onClick={() => setInputMode('local')}>
+                    {appMode === 'developer' ? <Code size={14} className="inline mr-1" /> : <FileText size={14} className="inline mr-1" />}
+                    {appMode === 'developer' ? 'Local Snippets' : 'Local Notes'}
+                  </button>
                 </div>
                 
                 <div className="p-6 md:p-10">
@@ -543,8 +547,6 @@ function MainApp() {
                     <input type="text" value={urlInput} onChange={e => { setUrlInput(e.target.value); setInputError(''); }} placeholder={appMode === 'developer' ? "Enter a GitHub Repo URL, raw link, or ANY public webpage..." : "Enter a Wikipedia link, article, or document URL..."} className={`w-full px-5 py-4 md:px-6 md:py-5 border rounded-xl md:rounded-2xl outline-none text-sm md:text-base font-medium transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white focus:bg-slate-900 focus:border-indigo-500' : 'bg-slate-50 border-slate-200 focus:bg-white focus:border-slate-400'}`} onKeyDown={e => e.key === 'Enter' && handleAnalyze()} />
                   ) : (
                     <div className="space-y-4 md:space-y-6">
-                      
-                      {/* DUAL BUTTON UPLOAD ZONE */}
                       <div className={`w-full border-2 border-dashed rounded-xl p-4 md:p-6 text-center transition-colors ${isDraggingOver ? (isDarkMode ? 'border-indigo-500 bg-indigo-900/30' : 'border-blue-500 bg-blue-50') : (isDarkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-300 bg-slate-50')}`} onDragOver={e=>{e.preventDefault(); setIsDraggingOver(true)}} onDragLeave={()=>setIsDraggingOver(false)} onDrop={e=>{e.preventDefault(); setIsDraggingOver(false); Array.from(e.dataTransfer.files).forEach(f => { const r = new FileReader(); r.onload = (ev) => setLocalFiles(p => (p.length===1 && !p[0].content) ? [{ id: Date.now()+Math.random(), name: f.name, content: ev.target.result }] : [...p, { id: Date.now()+Math.random(), name: f.name, content: ev.target.result }]); r.readAsText(f); });}}>
                         <Upload size={24} className="text-slate-400 mx-auto mb-3" />
                         <span className={`block text-xs md:text-sm font-bold mb-4 ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>Drag & Drop files or folders here</span>
@@ -561,12 +563,14 @@ function MainApp() {
                       <div className="max-h-48 md:max-h-64 overflow-y-auto space-y-3 custom-scroll pr-2">
                         {localFiles.map((file) => (
                           <div key={file.id} className={`border rounded-xl flex flex-col overflow-hidden ${isDarkMode ? 'border-slate-700' : 'border-slate-200'}`}>
-                            <div className={`flex px-3 py-2 border-b ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}><input type="text" value={file.name} onChange={e => setLocalFiles(p => p.map(f => f.id === file.id ? { ...f, name: e.target.value } : f))} className={`bg-transparent text-xs md:text-sm font-bold flex-1 outline-none ${isDarkMode ? 'text-white' : 'text-slate-900'}`} placeholder="filename.js" /><button onClick={() => setLocalFiles(p => p.filter(f => f.id !== file.id))} className="text-slate-400 hover:text-red-500"><Trash2 size={14}/></button></div>
-                            <textarea value={file.content} onChange={e => setLocalFiles(p => p.map(f => f.id === file.id ? { ...f, content: e.target.value } : f))} className={`w-full h-20 md:h-24 p-3 text-xs font-mono resize-none outline-none custom-scroll ${isDarkMode ? 'bg-slate-900 text-slate-300' : 'bg-white text-slate-800'}`} placeholder="// Paste code here..." />
+                            {/* DYNAMIC FILENAME PLACEHOLDER */}
+                            <div className={`flex px-3 py-2 border-b ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}><input type="text" value={file.name} onChange={e => setLocalFiles(p => p.map(f => f.id === file.id ? { ...f, name: e.target.value } : f))} className={`bg-transparent text-xs md:text-sm font-bold flex-1 outline-none ${isDarkMode ? 'text-white' : 'text-slate-900'}`} placeholder={appMode === 'developer' ? "filename.js" : "document.txt"} /><button onClick={() => setLocalFiles(p => p.filter(f => f.id !== file.id))} className="text-slate-400 hover:text-red-500"><Trash2 size={14}/></button></div>
+                            {/* DYNAMIC TEXTAREA PLACEHOLDER */}
+                            <textarea value={file.content} onChange={e => setLocalFiles(p => p.map(f => f.id === file.id ? { ...f, content: e.target.value } : f))} className={`w-full h-20 md:h-24 p-3 text-xs font-mono resize-none outline-none custom-scroll ${isDarkMode ? 'bg-slate-900 text-slate-300' : 'bg-white text-slate-800'}`} placeholder={appMode === 'developer' ? "// Paste code here..." : "Paste your text, notes, or document content here..."} />
                           </div>
                         ))}
                       </div>
-                      <button onClick={() => setLocalFiles(p => [...p, { id: Date.now(), name: `snippet_${p.length + 1}.js`, content: '' }])} className={`text-[10px] md:text-xs font-bold flex items-center ${isDarkMode ? 'text-indigo-400' : 'text-blue-600'}`}><Plus size={14} className="mr-1"/> Add Section</button>
+                      <button onClick={() => setLocalFiles(p => [...p, { id: Date.now(), name: appMode === 'developer' ? `snippet_${p.length + 1}.js` : `note_${p.length + 1}.txt`, content: '' }])} className={`text-[10px] md:text-xs font-bold flex items-center ${isDarkMode ? 'text-indigo-400' : 'text-blue-600'}`}><Plus size={14} className="mr-1"/> Add Section</button>
                     </div>
                   )}
 
@@ -656,14 +660,20 @@ function MainApp() {
                   <textarea value={selectedNode.userComment || ''} onChange={e => handleNodeEdit(selectedNode.id, 'userComment', e.target.value)} placeholder="Type intel here..." className={`w-full h-16 p-2 border rounded-lg outline-none text-xs resize-none custom-scroll ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white focus:bg-slate-700 focus:border-slate-500' : 'bg-slate-50 border-slate-200 text-slate-900 focus:bg-white focus:border-slate-300'}`} />
                 </div>
                 
+                {/* DYNAMIC SIDEBAR SOURCE TEXT */}
                 <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center mb-1.5"><Code size={12} className="mr-1.5"/> Source Code</label>
-                  <pre className={`p-3 rounded-xl text-[10px] overflow-x-auto max-h-48 custom-scroll ${isDarkMode ? 'bg-black border border-slate-800 text-slate-300' : 'bg-slate-900 border-slate-700 text-slate-300'}`}><code>{selectedNode.code_snippet || 'No code provided'}</code></pre>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center mb-1.5">
+                    {appMode === 'developer' ? <Code size={12} className="mr-1.5"/> : <FileText size={12} className="mr-1.5"/>}
+                    {appMode === 'developer' ? 'Source Code' : 'Source Excerpt'}
+                  </label>
+                  <pre className={`p-3 rounded-xl text-[10px] overflow-x-auto max-h-48 custom-scroll ${isDarkMode ? 'bg-black border border-slate-800 text-slate-300' : 'bg-slate-900 border-slate-700 text-slate-300'}`}><code>{selectedNode.code_snippet || (appMode === 'developer' ? 'No code provided' : 'No text provided')}</code></pre>
                 </div>
                 
+                {/* DYNAMIC ACTION BUTTON */}
                 <div className="pt-2 pb-6">
                   <button onClick={() => handleRefactor(selectedNode)} disabled={isRefactoring} className={`w-full py-2.5 rounded-xl text-xs font-semibold disabled:opacity-70 flex justify-center items-center shadow-md active:scale-95 ${isDarkMode ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-white'}`}>
-                    {isRefactoring ? <Loader2 size={14} className="animate-spin mr-2"/> : <Zap size={14} className="mr-2 text-yellow-400 fill-yellow-400"/>} Ask AI to Refactor
+                    {isRefactoring ? <Loader2 size={14} className="animate-spin mr-2"/> : <Zap size={14} className="mr-2 text-yellow-400 fill-yellow-400"/>} 
+                    {appMode === 'developer' ? 'Ask AI to Refactor' : 'Ask AI to Elaborate'}
                   </button>
                   {refactorSuggestion && <div className={`mt-3 p-3 border rounded-xl text-[10px] whitespace-pre-wrap max-h-64 overflow-y-auto custom-scroll shadow-inner ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-slate-50 border-slate-200'}`}>{refactorSuggestion}</div>}
                 </div>
