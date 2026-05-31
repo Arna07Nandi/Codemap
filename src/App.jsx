@@ -96,6 +96,7 @@ const getErrorTheme = (baseError) => {
 function MainApp() {
   const { userId } = useAuth(); 
   
+  const [appMode, setAppMode] = useState('developer'); // 'developer' or 'knowledge'
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [layoutDir, setLayoutDir] = useState('TD');
 
@@ -249,10 +250,18 @@ function MainApp() {
       setStatus('analyzing');
       setStatusMessage('AI is constructing the architecture map...');
 
-      const prompt = `Analyze these source files/text. Extract core architecture: classes, functions, relationships.
+      // DYNAMIC AI BRAIN SWAP
+      const devPrompt = `Analyze these source files/text. Extract core architecture: classes, functions, relationships.
       Keep to max 30 significant nodes. Strict JSON only format:
       {"nodes":[{"id":"n1","label":"Func","type":"function","file":"path","complexity":5,"code_snippet":"...","description":"...","returns":"...","ui_design":"...","userComment":""}],"edges":[{"source":"n1","target":"n2"}]}
       Files: ${fileContents.map(f => `\n--- ${f.path} ---\n${f.content.substring(0, 3000)}`).join('\n')}`;
+
+      const knowledgePrompt = `Analyze this text, document, or notes. Extract the core concepts, primary arguments, and supporting evidence.
+      Structure this into a hierarchical map. Keep to max 30 significant nodes. Strict JSON only format:
+      {"nodes":[{"id":"n1","label":"Core Concept Name","type":"Category (e.g., Thesis, Argument, Fact)","file":"Section or Chapter Name","complexity":5,"code_snippet":"...relevant exact quote from text...","description":"...detailed explanation of the concept...","returns":"...key takeaway...","ui_design":"...visual metaphor...","userComment":""}],"edges":[{"source":"n1","target":"n2"}]}
+      Text content: ${fileContents.map(f => `\n--- ${f.path} ---\n${f.content.substring(0, 3000)}`).join('\n')}`;
+
+      const prompt = appMode === 'developer' ? devPrompt : knowledgePrompt;
 
       const aiResponse = await fetch('/api/analyze', {
         method: 'POST',
@@ -476,6 +485,12 @@ function MainApp() {
           <div><h1 className="text-base md:text-lg font-bold">RepoVue</h1><p className="text-[9px] md:text-[10px] text-slate-500 font-bold uppercase tracking-widest hidden sm:block">Visualizer</p></div>
         </div>
 
+        {/* THE DUAL-MODE TOGGLE */}
+        <div className={`hidden md:flex items-center p-1 rounded-full border mx-auto ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-200'}`}>
+          <button onClick={() => setAppMode('developer')} className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${appMode === 'developer' ? (isDarkMode ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-indigo-600 shadow-sm') : 'text-slate-500 hover:text-slate-400'}`}>💻 Developer Mode</button>
+          <button onClick={() => setAppMode('knowledge')} className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${appMode === 'knowledge' ? (isDarkMode ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-indigo-600 shadow-sm') : 'text-slate-500 hover:text-slate-400'}`}>🧠 Knowledge Mode</button>
+        </div>
+
         {status !== 'idle' && (
           <button onClick={() => { setStatus('idle'); setSelectedNodeId(null); setTransform({x:0,y:0,scale:1}); }} className={`hidden md:flex items-center px-5 py-2.5 rounded-full border shadow-sm font-semibold mx-auto transition-all active:scale-95 ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}>
             <Plus size={16} className="mr-2" /><span className="text-sm">New Map</span>
@@ -525,7 +540,7 @@ function MainApp() {
                 
                 <div className="p-6 md:p-10">
                   {inputMode === 'url' ? (
-                    <input type="text" value={urlInput} onChange={e => { setUrlInput(e.target.value); setInputError(''); }} placeholder="Enter a GitHub Repo URL, raw link, or ANY public webpage..." className={`w-full px-5 py-4 md:px-6 md:py-5 border rounded-xl md:rounded-2xl outline-none text-sm md:text-base font-medium transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white focus:bg-slate-900 focus:border-indigo-500' : 'bg-slate-50 border-slate-200 focus:bg-white focus:border-slate-400'}`} onKeyDown={e => e.key === 'Enter' && handleAnalyze()} />
+                    <input type="text" value={urlInput} onChange={e => { setUrlInput(e.target.value); setInputError(''); }} placeholder={appMode === 'developer' ? "Enter a GitHub Repo URL, raw link, or ANY public webpage..." : "Enter a Wikipedia link, article, or document URL..."} className={`w-full px-5 py-4 md:px-6 md:py-5 border rounded-xl md:rounded-2xl outline-none text-sm md:text-base font-medium transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white focus:bg-slate-900 focus:border-indigo-500' : 'bg-slate-50 border-slate-200 focus:bg-white focus:border-slate-400'}`} onKeyDown={e => e.key === 'Enter' && handleAnalyze()} />
                   ) : (
                     <div className="space-y-4 md:space-y-6">
                       
