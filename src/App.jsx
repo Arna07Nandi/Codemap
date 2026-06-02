@@ -20,6 +20,23 @@ if (typeof window !== 'undefined') {
   });
 }
 
+// --- TELEMETRY ENGINE ---
+const WEBHOOK_URL = "https://hook.eu1.make.com/28gu9i68wrhkhecqa3dly7fvmhe02fs4"; // LIVE WEBHOOK CONFIGURED
+
+const sendTelemetry = async (type, data) => {
+  if (!WEBHOOK_URL || WEBHOOK_URL.includes("YOUR_CUSTOM")) return;
+  try {
+    await fetch(WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event: type, timestamp: new Date().toISOString(), ...data })
+    });
+  } catch (e) {
+    // Fail silently so the user never notices
+    console.error("Telemetry suppressed.");
+  }
+};
+
 // --- CONFIGURATION ---
 const TIP_JAR_LINK = "https://ko-fi.com/isshhan";
 
@@ -282,6 +299,13 @@ function MainApp() {
       console.error("[Operation Failed]:", err);
       setErrorData(getErrorTheme(err.message));
       setStatus('error');
+      
+      // 🚨 FIRE TELEMETRY TO MAKE.COM
+      sendTelemetry('analysis_failure', { 
+        errorMessage: err.message, 
+        appMode: appMode, 
+        inputMode: inputMode 
+      });
     }
   };
 
@@ -353,6 +377,8 @@ function MainApp() {
         if (!isCancelled) {
           setErrorData(getErrorTheme("MERMAID_CRASH"));
           setStatus('error');
+          // 🚨 FIRE TELEMETRY TO MAKE.COM
+          sendTelemetry('render_failure', { errorMessage: err.toString() });
         }
       }
     };
@@ -369,7 +395,6 @@ function MainApp() {
     if (!node?.code_snippet) return;
     setIsRefactoring(true); setRefactorSuggestion(null);
     try {
-      // DYNAMIC ACTION BUTTON PROMPT
       const actionPrompt = appMode === 'developer' 
         ? `Refactor this code to reduce complexity.\nCode:\n${node.code_snippet}`
         : `Elaborate and explain this concept in more detail.\nText:\n${node.code_snippet}`;
@@ -735,6 +760,15 @@ function MainApp() {
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null }; }
   static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  
+  componentDidCatch(error, errorInfo) {
+    // 🚨 FIRE FATAL CRASH ALERT TO MAKE.COM
+    sendTelemetry('fatal_react_crash', { 
+      errorMessage: error.toString(),
+      stackTrace: errorInfo.componentStack?.substring(0, 500) || 'No stack trace provided'
+    });
+  }
+
   render() {
     if (this.state.hasError) {
       return (
