@@ -9,10 +9,8 @@ import {
   MessageSquare, Moon, Sun, ArrowRightLeft, ArrowDownUp, Share2, Menu
 } from 'lucide-react';
 
-// --- SUPABASE IMPORT ---
 import { supabase } from './supabase';
 
-// --- THE GLOBAL CRASH CATCHER ---
 if (typeof window !== 'undefined') {
   window.addEventListener('error', (event) => {
     document.body.innerHTML = `<div style="padding: 20px; font-family: sans-serif; background: #fff1f2; color: #e11d48; height: 100vh;">
@@ -23,9 +21,7 @@ if (typeof window !== 'undefined') {
   });
 }
 
-// --- TELEMETRY ENGINE ---
 const WEBHOOK_URL = "https://hook.eu1.make.com/28gu9i68wrhkhecqa3dly7fvmhe02fs4"; 
-
 const sendTelemetry = async (type, data) => {
   if (!WEBHOOK_URL || WEBHOOK_URL.includes("YOUR_CUSTOM")) return;
   try {
@@ -34,15 +30,11 @@ const sendTelemetry = async (type, data) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ event: type, timestamp: new Date().toISOString(), ...data })
     });
-  } catch (e) {
-    console.error("Telemetry suppressed.");
-  }
+  } catch (e) { console.error("Telemetry suppressed."); }
 };
 
-// --- CONFIGURATION ---
 const TIP_JAR_LINK = "https://ko-fi.com/isshhan";
 
-// --- Tactical Data Extraction & Sanitization ---
 const extractJSON = (text) => {
   if (!text) throw new Error("AI_PARSE_ERROR_EMPTY");
   try {
@@ -52,9 +44,7 @@ const extractJSON = (text) => {
     const end = text.lastIndexOf('}');
     if (start !== -1 && end !== -1) return JSON.parse(text.substring(start, end + 1));
     return JSON.parse(text);
-  } catch (e) {
-    throw new Error("AI_PARSE_ERROR");
-  }
+  } catch (e) { throw new Error("AI_PARSE_ERROR"); }
 };
 
 const sanitizeHtml = (text) => {
@@ -71,10 +61,7 @@ const loadMermaid = () => {
     script.src = 'https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js';
     script.onload = () => {
       window.mermaid.initialize({
-        startOnLoad: false, 
-        theme: 'base', 
-        securityLevel: 'loose',
-        useMaxWidth: false, 
+        startOnLoad: false, theme: 'base', securityLevel: 'loose', useMaxWidth: false, 
         flowchart: { htmlLabels: true, curve: 'basis', padding: 30, nodeSpacing: 80, rankSpacing: 100 }
       });
       resolve(window.mermaid);
@@ -84,7 +71,6 @@ const loadMermaid = () => {
   });
 };
 
-// --- PDF PARSER INJECTION ---
 const loadPdfJs = () => {
   return new Promise((resolve, reject) => {
     if (window.pdfjsLib) return resolve(window.pdfjsLib);
@@ -114,11 +100,10 @@ const getErrorTheme = (baseError) => {
   const errStr = String(baseError).toLowerCase();
   const isCORS = errStr.includes("cors") || errStr.includes("fetch") || errStr.includes("network");
   const isMermaid = errStr.includes("mermaid");
-  
   const themes = [
     { type: 'professional', icon: '🛡️', title: 'Access Restricted', msg: isMermaid ? "The rendering engine failed to parse the AI's data structure." : (isCORS ? "The target server actively refused the connection due to strict security policies." : "The AI pipeline returned a malformed data structure."), steps: ["Acknowledge network security block.", "Switch input mode to 'Local Files / Snippets'.", "Manually upload the source code.", "Re-initialize the analysis."], styles: { border: 'border-slate-300', text: 'text-slate-800', bgLight: 'bg-slate-100', bgBtn: 'bg-slate-800', hover: 'hover:bg-slate-900' } }
   ];
-  return themes[Math.floor(Math.random() * themes.length)];
+  return themes[0];
 };
 
 function MainApp() {
@@ -130,7 +115,7 @@ function MainApp() {
 
   const [localHistory, setLocalHistory] = useState([]);
   const [historySidebarOpen, setHistorySidebarOpen] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false); // Mobile Menu State
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false); 
   const importFileRef = useRef(null);
 
   const [inputMode, setInputMode] = useState('url');
@@ -158,19 +143,47 @@ function MainApp() {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
-  useEffect(() => { 
-    loadMermaid().catch(() => {}); 
-    loadPdfJs().catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    if (architecture) generateMermaid(architecture);
-  }, [isDarkMode, layoutDir, architecture]);
-
   const showToast = useCallback((msg, type = 'info') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 4000);
   }, []);
+
+  // --- AUTOMATICALLY LOAD SHARED MAPS ON BOOT ---
+  useEffect(() => { 
+    loadMermaid().catch(() => {}); 
+    loadPdfJs().catch(() => {});
+
+    // Check if user is visiting a shared link
+    const path = window.location.pathname;
+    if (path.startsWith('/map/')) {
+      const mapId = path.split('/')[2];
+      if (mapId) fetchSharedMap(mapId);
+    }
+  }, []);
+
+  const fetchSharedMap = async (id) => {
+    setStatus('fetching');
+    setStatusMessage('Decrypting shared map...');
+    try {
+      const { data, error } = await supabase.from('maps').select('*').eq('id', id).single();
+      if (error) throw error;
+      
+      if (data) {
+        setAppMode(data.mode || 'developer');
+        setMermaidCode(data.mermaid_code);
+        setStatus('ready');
+        showToast(`Loaded map: ${data.title}`, "success");
+      }
+    } catch (err) {
+      console.error(err);
+      setStatus('idle');
+      showToast("Map not found or link expired.", "error");
+    }
+  };
+
+  useEffect(() => {
+    if (architecture) generateMermaid(architecture);
+  }, [isDarkMode, layoutDir, architecture]);
 
   const processFiles = async (files) => {
     const pdfjs = await loadPdfJs().catch(() => null);
@@ -186,19 +199,15 @@ function MainApp() {
             const typedarray = new Uint8Array(ev.target.result);
             const pdf = await pdfjs.getDocument(typedarray).promise;
             let fullText = '';
-            
             const maxPages = Math.min(pdf.numPages, 15);
             for (let i = 1; i <= maxPages; i++) {
               const page = await pdf.getPage(i);
               const content = await page.getTextContent();
               fullText += content.items.map(item => item.str).join(' ') + '\n\n';
             }
-            
             setLocalFiles(p => (p.length===1 && !p[0].content) ? [{ id: Date.now()+Math.random(), name: f.name, content: fullText }] : [...p, { id: Date.now()+Math.random(), name: f.name, content: fullText }]);
-            showToast(`Extracted ${maxPages} pages of text!`, 'success');
-          } catch (err) {
-            showToast("PDF is encrypted or a raw image scan.", "error");
-          }
+            showToast(`Extracted ${maxPages} pages!`, 'success');
+          } catch (err) { showToast("PDF is encrypted.", "error"); }
         };
         r.readAsArrayBuffer(f);
       } else {
@@ -210,44 +219,26 @@ function MainApp() {
   };
 
   const handleShareMap = async () => {
-    if (!architecture || !mermaidCode) return showToast("Generate a map first!", "error");
+    if (!mermaidCode) return showToast("Generate a map first!", "error");
     setIsSharing(true);
-    
     try {
       const title = inputMode === 'url' ? urlInput.split('/').pop() || 'Shared Map' : (appMode === 'developer' ? 'Code Architecture' : 'Knowledge Map');
-      
       const uniqueId = Math.random().toString(36).substring(2, 11);
       
-      const { error } = await supabase
-        .from('maps')
-        .insert([
-          { 
-            id: uniqueId,
-            user_id: userId || 'anonymous', 
-            title: title,
-            mode: appMode,
-            mermaid_code: mermaidCode
-          }
-        ]);
-
+      const { error } = await supabase.from('maps').insert([{ id: uniqueId, user_id: userId || 'anonymous', title: title, mode: appMode, mermaid_code: mermaidCode }]);
       if (error) throw error;
       
       const shareUrl = `${window.location.origin}/map/${uniqueId}`;
       await navigator.clipboard.writeText(shareUrl);
       showToast("Public link copied to clipboard! 🚀", "success");
-      
     } catch (e) {
-      console.error("Share Error:", e);
       showToast("Failed to generate share link.", "error");
-      sendTelemetry('share_failure', { errorMessage: e.toString() });
-    } finally {
-      setIsSharing(false);
-    }
+    } finally { setIsSharing(false); }
   };
 
   const saveToHistory = () => {
     if (!architecture || !mermaidCode) return;
-    const title = inputMode === 'url' ? urlInput.split('/').pop() || (appMode === 'developer' ? 'Local Code Snippets' : 'Local Notes') : (appMode === 'developer' ? 'Local Code Snippets' : 'Local Notes');
+    const title = inputMode === 'url' ? urlInput.split('/').pop() || 'Local Map' : 'Local Map';
     const newItem = { id: Date.now().toString(), title, createdAt: Date.now(), architecture, mermaidCode };
     setLocalHistory(prev => [newItem, ...prev]);
     showToast("Map saved to Vault!", "success");
@@ -256,9 +247,7 @@ function MainApp() {
   const handleExportBackup = () => {
     if (localHistory.length === 0) return showToast("Vault is empty.", "warning");
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(localHistory));
-    const node = document.createElement('a');
-    node.setAttribute("href", dataStr);
-    node.setAttribute("download", `repovue_vault_${new Date().toISOString().split('T')[0]}.json`);
+    const node = document.createElement('a'); node.setAttribute("href", dataStr); node.setAttribute("download", `repovue_vault.json`);
     document.body.appendChild(node); node.click(); node.remove();
   };
 
@@ -269,14 +258,11 @@ function MainApp() {
     reader.onload = (event) => {
       try {
         const imported = JSON.parse(event.target.result);
-        if (Array.isArray(imported)) {
-          setLocalHistory(imported);
-          showToast("Vault restored successfully.", "success");
-        } else throw new Error();
+        if (Array.isArray(imported)) { setLocalHistory(imported); showToast("Vault restored.", "success"); } 
+        else throw new Error();
       } catch { showToast("Invalid backup file.", "error"); }
     };
-    reader.readAsText(file);
-    e.target.value = null;
+    reader.readAsText(file); e.target.value = null;
   };
 
   const fetchWithRetry = async (url, options, retries = 2) => {
@@ -293,18 +279,11 @@ function MainApp() {
   };
 
   const handleAnalyze = async () => {
-    setInputError('');
-    let fileContents = [];
-
+    setInputError(''); let fileContents = [];
     try {
       if (inputMode === 'url') {
-        if (!urlInput.trim() || !/^https?:\/\//i.test(urlInput)) {
-          return setInputError("URL must begin with http:// or https://");
-        }
-        
-        setStatus('fetching'); 
-        setStatusMessage('Infiltrating target URL...');
-
+        if (!urlInput.trim() || !/^https?:\/\//i.test(urlInput)) return setInputError("URL must begin with http:// or https://");
+        setStatus('fetching'); setStatusMessage('Infiltrating target URL...');
         const gitRepoMatch = urlInput.match(/^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/?$/);
         const gitFileMatch = urlInput.includes('github.com') && urlInput.includes('/blob/');
 
@@ -315,10 +294,8 @@ function MainApp() {
           const treeData = await fetchWithRetry(`https://api.github.com/repos/${owner}/${repo}/git/trees/${repoData.default_branch}?recursive=1`);
           const validExts = ['.js', '.jsx', '.ts', '.tsx', '.py', '.java', '.cpp', '.go', '.rs', '.css', '.html'];
           const files = treeData.tree.filter(f => f.type === 'blob' && validExts.some(ext => f.path.endsWith(ext)) && !f.path.includes('test')).slice(0, 10);
-          
-          if (!files.length) throw new Error("Target repository contains no supported architecture files.");
+          if (!files.length) throw new Error("No supported architecture files.");
           setStatusMessage(`Extracting ${files.length} crucial files...`);
-          
           fileContents = await Promise.all(files.map(async (f) => {
             const content = await fetchWithRetry(`https://raw.githubusercontent.com/${owner}/${repo}/${repoData.default_branch}/${f.path}`);
             return { path: f.path, content };
@@ -328,110 +305,64 @@ function MainApp() {
           try {
             const content = await fetchWithRetry(fetchUrl);
             const lowerContent = content.trim().toLowerCase();
-            
             if (lowerContent.startsWith('<!doctype') || lowerContent.startsWith('<html')) {
               setStatusMessage('Bypassing UI, extracting raw logic...');
-              const parser = new DOMParser();
-              const doc = parser.parseFromString(content, 'text/html');
+              const parser = new DOMParser(); const doc = parser.parseFromString(content, 'text/html');
               const codeBlocks = Array.from(doc.querySelectorAll('pre, code')).map(el => el.textContent).join('\n\n');
-              
-              if (codeBlocks.trim().length > 50) {
-                fileContents = [{ path: 'scraped_code_blocks.txt', content: codeBlocks.substring(0, 15000) }];
-              } else {
-                fileContents = [{ path: 'scraped_page_text.txt', content: (doc.body?.innerText || content).substring(0, 15000) }];
-              }
-            } else {
-              fileContents = [{ path: fetchUrl.split('/').pop() || 'raw_data.txt', content }];
-            }
-          } catch (fetchErr) {
-            throw new Error(`CORS_BLOCK_DETECTED: ${fetchErr.message}`);
-          }
+              if (codeBlocks.trim().length > 50) fileContents = [{ path: 'scraped_code_blocks.txt', content: codeBlocks.substring(0, 15000) }];
+              else fileContents = [{ path: 'scraped_page_text.txt', content: (doc.body?.innerText || content).substring(0, 15000) }];
+            } else { fileContents = [{ path: fetchUrl.split('/').pop() || 'raw_data.txt', content }]; }
+          } catch (fetchErr) { throw new Error(`CORS_BLOCK_DETECTED: ${fetchErr.message}`); }
         }
       } else {
         const validFiles = localFiles.filter(f => f.content.trim());
         if (!validFiles.length) return setInputError("Payload empty. Provide local input.");
-        fileContents = validFiles.map(f => ({ path: f.name || (appMode === 'developer' ? 'snippet' : 'note'), content: f.content }));
+        fileContents = validFiles.map(f => ({ path: f.name || 'snippet', content: f.content }));
       }
 
       setErrorData(null); setArchitecture(null); setMermaidCode(''); setSelectedNodeId(null); setTransform({ x: 0, y: 0, scale: 1 });
-      setStatus('analyzing');
-      setStatusMessage('AI is constructing the map...');
+      setStatus('analyzing'); setStatusMessage('AI is constructing the map...');
 
-      const devPrompt = `Analyze these source files/text. Extract core architecture: classes, functions, relationships.
-      Keep to max 30 significant nodes. Strict JSON only format:
-      {"nodes":[{"id":"n1","label":"Func","type":"function","file":"path","complexity":5,"code_snippet":"...","description":"...","returns":"...","ui_design":"...","userComment":""}],"edges":[{"source":"n1","target":"n2"}]}
-      Files: ${fileContents.map(f => `\n--- ${f.path} ---\n${f.content.substring(0, 3000)}`).join('\n')}`;
-
-      const knowledgePrompt = `Analyze this text, document, or notes. Extract the core concepts, primary arguments, and supporting evidence.
-      Structure this into a hierarchical map. Keep to max 30 significant nodes. Strict JSON only format:
-      {"nodes":[{"id":"n1","label":"Core Concept Name","type":"Category (e.g., Thesis, Argument, Fact)","file":"Section or Chapter Name","complexity":5,"code_snippet":"...relevant exact quote from text...","description":"...detailed explanation of the concept...","returns":"...key takeaway...","ui_design":"...visual metaphor...","userComment":""}],"edges":[{"source":"n1","target":"n2"}]}
-      Text content: ${fileContents.map(f => `\n--- ${f.path} ---\n${f.content.substring(0, 3000)}`).join('\n')}`;
+      const devPrompt = `Analyze these source files/text. Extract core architecture: classes, functions, relationships. Max 30 nodes. Strict JSON only: {"nodes":[{"id":"n1","label":"Func","type":"function","file":"path","complexity":5,"code_snippet":"...","description":"...","returns":"...","ui_design":"...","userComment":""}],"edges":[{"source":"n1","target":"n2"}]} Files: ${fileContents.map(f => `\n--- ${f.path} ---\n${f.content.substring(0, 3000)}`).join('\n')}`;
+      const knowledgePrompt = `Analyze this text. Extract core concepts. Max 30 nodes. Strict JSON only: {"nodes":[{"id":"n1","label":"Concept","type":"Category","file":"Section","complexity":5,"code_snippet":"...","description":"...","returns":"...","ui_design":"...","userComment":""}],"edges":[{"source":"n1","target":"n2"}]} Text: ${fileContents.map(f => `\n--- ${f.path} ---\n${f.content.substring(0, 3000)}`).join('\n')}`;
 
       const prompt = appMode === 'developer' ? devPrompt : knowledgePrompt;
 
-      const aiResponse = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, userId })
-      });
-
-      let data;
-      try { data = await aiResponse.json(); } 
-      catch { throw new Error("Backend communication severed."); }
-
+      const aiResponse = await fetch('/api/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt, userId }) });
+      let data; try { data = await aiResponse.json(); } catch { throw new Error("Backend communication severed."); }
       if (!aiResponse.ok) throw new Error(data.error || "Backend rejected request.");
 
       const archData = extractJSON(data.candidates[0].content.parts[0].text);
       setArchitecture(archData);
       generateMermaid(archData);
+      window.history.pushState({}, '', '/'); // Reset URL if they just generated a new map
       setStatus('ready');
 
     } catch (err) {
       console.error("[Operation Failed]:", err);
       setErrorData(getErrorTheme(err.message));
       setStatus('error');
-      
-      sendTelemetry('analysis_failure', { 
-        errorMessage: err.message, 
-        appMode: appMode, 
-        inputMode: inputMode 
-      });
     }
   };
 
   const generateMermaid = useCallback((data) => {
     if (!data?.nodes) return;
-    
-    let m = `%%{init: {'theme': '${isDarkMode ? 'dark' : 'base'}', 'themeVariables': { 'fontFamily': 'Inter, sans-serif', 'primaryColor': '${isDarkMode ? '#0f172a' : '#ffffff'}', 'primaryTextColor': '${isDarkMode ? '#f8fafc' : '#0f172a'}', 'lineColor': '${isDarkMode ? '#475569' : '#94a3b8'}' }}}%%\n`;
-    m += `graph ${layoutDir};\n`; 
-
+    let m = `%%{init: {'theme': '${isDarkMode ? 'dark' : 'base'}', 'themeVariables': { 'fontFamily': 'Inter, sans-serif', 'primaryColor': '${isDarkMode ? '#0f172a' : '#ffffff'}', 'primaryTextColor': '${isDarkMode ? '#f8fafc' : '#0f172a'}', 'lineColor': '${isDarkMode ? '#475569' : '#94a3b8'}' }}}%%\ngraph ${layoutDir};\n`; 
     const files = [...new Set(data.nodes.map(n => n.file || 'Unknown'))];
-    const nodeBg = isDarkMode ? '#1e293b' : '#ffffff';
-    const nodeText = isDarkMode ? '#f8fafc' : '#0f172a';
-    
+    const nodeBg = isDarkMode ? '#1e293b' : '#ffffff'; const nodeText = isDarkMode ? '#f8fafc' : '#0f172a';
     files.forEach((file, i) => {
       m += `  subgraph file_${i} ["📄 ${sanitizeHtml(file)}"]\n    direction TB\n`;
       data.nodes.filter(n => (n.file || 'Unknown') === file).forEach(node => {
         const isCmplx = (node.complexity || 1) > 7;
-        
         let html = `<div xmlns='http://www.w3.org/1999/xhtml' class='node-card' style='background-color:${nodeBg}; color:${nodeText}; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border: 1px solid ${isDarkMode ? '#334155' : '#e2e8f0'};'>`;
         html += `<div class='node-title-row'><span class='node-title'>${sanitizeHtml(node.label)}</span><span class='node-badge ${isCmplx ? 'cmplx' : 'clean'}'>C: ${node.complexity || 1}</span></div>`;
         if (node.description || node.returns || node.ui_design) { html += `<div class='node-hint'>🔍 Click to inspect logic</div>`; }
         html += `</div>`;
-        
         m += `    ${makeSafeId(node.id)}("${html}"):::${isCmplx ? 'complexNode' : 'cleanNode'}\n`;
       });
       m += `  end\n  style file_${i} fill:${isDarkMode ? '#0f172a80' : '#f8fafc50'},stroke:${isDarkMode ? '#334155' : '#cbd5e1'},stroke-width:1px,stroke-dasharray:4 4,rx:12,ry:12\n`;
     });
-
-    if (data.edges) {
-      data.edges.forEach(e => { 
-        if (e.source && e.target) {
-          m += `  ${makeSafeId(e.source)} --> ${makeSafeId(e.target)}\n`; 
-        }
-      });
-    }
-    
+    if (data.edges) data.edges.forEach(e => { if (e.source && e.target) m += `  ${makeSafeId(e.source)} --> ${makeSafeId(e.target)}\n`; });
     m += `  classDef complexNode fill:${isDarkMode ? '#450a0a' : '#fff1f2'},stroke:${isDarkMode ? '#ef4444' : '#fca5a5'},stroke-width:1.5px,rx:8px,ry:8px;\n  classDef cleanNode fill:${nodeBg},stroke:${isDarkMode ? '#334155' : '#e2e8f0'},stroke-width:1.5px,rx:8px,ry:8px;\n`;
     setMermaidCode(m);
   }, [isDarkMode, layoutDir]);
@@ -439,27 +370,19 @@ function MainApp() {
   useEffect(() => {
     if (status !== 'ready' || !mermaidCode || !mapContentRef.current) return;
     let isCancelled = false;
-
     const render = async () => {
       try {
         const mermaid = await loadMermaid();
         mapContentRef.current.innerHTML = '';
         const { svg } = await mermaid.render(`mermaid-${Date.now()}`, mermaidCode);
         if (isCancelled) return;
-        
         mapContentRef.current.innerHTML = svg;
-        
         const renderedSvg = mapContentRef.current.querySelector('svg');
         if (renderedSvg) {
-          // FIX: Force the tiny map to scale up fully within the container
-          renderedSvg.removeAttribute('width');
-          renderedSvg.removeAttribute('height');
-          renderedSvg.style.width = '100%';
-          renderedSvg.style.height = '100%';
-          renderedSvg.style.minWidth = '800px'; 
-          renderedSvg.style.minHeight = '600px';
+          renderedSvg.removeAttribute('width'); renderedSvg.removeAttribute('height');
+          renderedSvg.style.width = '100%'; renderedSvg.style.height = '100%';
+          renderedSvg.style.minWidth = '800px'; renderedSvg.style.minHeight = '600px';
         }
-
         mapContentRef.current.querySelectorAll('.node').forEach(n => {
           n.style.cursor = 'pointer';
           n.addEventListener('click', () => {
@@ -469,12 +392,7 @@ function MainApp() {
           });
         });
       } catch (err) { 
-        console.error("Render Engine Failure:", err);
-        if (!isCancelled) {
-          setErrorData(getErrorTheme("MERMAID_CRASH"));
-          setStatus('error');
-          sendTelemetry('render_failure', { errorMessage: err.toString() });
-        }
+        if (!isCancelled) { setErrorData(getErrorTheme("MERMAID_CRASH")); setStatus('error'); }
       }
     };
     render();
@@ -490,97 +408,49 @@ function MainApp() {
     if (!node?.code_snippet) return;
     setIsRefactoring(true); setRefactorSuggestion(null);
     try {
-      const actionPrompt = appMode === 'developer' 
-        ? `Refactor this code to reduce complexity.\nCode:\n${node.code_snippet}`
-        : `Elaborate and explain this concept in more detail.\nText:\n${node.code_snippet}`;
-
-      const aiResponse = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: actionPrompt })
-      });
-      const data = await aiResponse.json();
-      setRefactorSuggestion(data.candidates[0].content.parts[0].text);
-    } catch { setRefactorSuggestion("Operation failed. Backend unreachable."); } 
-    finally { setIsRefactoring(false); }
+      const actionPrompt = appMode === 'developer' ? `Refactor code.\nCode:\n${node.code_snippet}` : `Elaborate.\nText:\n${node.code_snippet}`;
+      const aiResponse = await fetch('/api/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: actionPrompt }) });
+      const data = await aiResponse.json(); setRefactorSuggestion(data.candidates[0].content.parts[0].text);
+    } catch { setRefactorSuggestion("Operation failed."); } finally { setIsRefactoring(false); }
   };
 
   const exportMap = (type) => {
-    setExportMenuOpen(false);
-    if (!mapContentRef.current) return;
-
+    setExportMenuOpen(false); if (!mapContentRef.current) return;
     const triggerDownload = (url, name) => {
-      try {
-        const a = document.createElement('a'); a.href = url; a.download = name;
-        document.body.appendChild(a); a.click(); a.remove();
-        showToast(`Extraction complete: ${name}`, 'success');
-      } catch { showToast("Download suppressed by browser.", 'error'); }
+      try { const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); showToast(`Extraction complete: ${name}`, 'success'); } catch { showToast("Download suppressed.", 'error'); }
     };
-
     if (type === 'md') {
       let md = `# Map Export\n\n\`\`\`mermaid\n${mermaidCode}\n\`\`\`\n\n## Node Details\n\n`;
       architecture?.nodes.forEach(n => {
         md += `### ${n.label}\n- **File:** \`${n.file}\`\n- **Complexity:** ${n.complexity}\n`;
-        if (n.description) md += `- **Action:** ${n.description}\n`;
-        if (n.returns) md += `- **Returns:** ${n.returns}\n`;
-        md += `\n`;
+        if (n.description) md += `- **Action:** ${n.description}\n`; if (n.returns) md += `- **Returns:** ${n.returns}\n\n`;
       });
       return triggerDownload("data:text/markdown;charset=utf-8," + encodeURIComponent(md), 'map_export.md');
     }
-
     const svgEl = mapContentRef.current.querySelector('svg');
-    if (!svgEl) return showToast("No map rendered to export!", 'error');
-    
+    if (!svgEl) return showToast("No map rendered!", 'error');
     const cloned = svgEl.cloneNode(true);
-    const style = document.createElement('style'); style.textContent = EXPORT_STYLES;
-    cloned.insertBefore(style, cloned.firstChild);
-    
-    const viewBox = svgEl.getAttribute('viewBox');
-    let baseWidth = 1200, baseHeight = 800;
-    
-    if (viewBox) {
-      const dims = viewBox.split(' ').map(Number);
-      baseWidth = dims[2]; baseHeight = dims[3];
-    } else {
-      const bbox = svgEl.getBoundingClientRect();
-      baseWidth = bbox.width; baseHeight = bbox.height;
-    }
-
-    cloned.setAttribute('width', baseWidth); 
-    cloned.setAttribute('height', baseHeight);
+    const style = document.createElement('style'); style.textContent = EXPORT_STYLES; cloned.insertBefore(style, cloned.firstChild);
+    const viewBox = svgEl.getAttribute('viewBox'); let baseWidth = 1200, baseHeight = 800;
+    if (viewBox) { const dims = viewBox.split(' ').map(Number); baseWidth = dims[2]; baseHeight = dims[3]; } 
+    else { const bbox = svgEl.getBoundingClientRect(); baseWidth = bbox.width; baseHeight = bbox.height; }
+    cloned.setAttribute('width', baseWidth); cloned.setAttribute('height', baseHeight);
     if (!cloned.getAttribute('xmlns')) cloned.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-
     const svgData = new XMLSerializer().serializeToString(cloned);
     const svgUrl = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgData);
-    
     if (type === 'svg') return triggerDownload(svgUrl, 'map_export.svg');
     
-    showToast("Compiling 4K High-Res PNG...", 'info');
+    showToast("Compiling High-Res PNG...", 'info');
     const img = new Image(); 
-    
     img.onload = () => {
       try {
-        const scale = 4;
-        const cvs = document.createElement('canvas'); 
-        const ctx = cvs.getContext('2d');
-        
-        cvs.width = baseWidth * scale; 
-        cvs.height = baseHeight * scale;
-        
-        ctx.fillStyle = isDarkMode ? "#0f172a" : "#f8fafc"; 
-        ctx.fillRect(0, 0, cvs.width, cvs.height);
-        
-        ctx.scale(scale, scale); 
-        ctx.drawImage(img, 0, 0); 
-        
-        const pngData = cvs.toDataURL('image/png'); 
-        triggerDownload(pngData, 'map_export.png');
-      } catch (err) {
-        showToast("Mobile browser blocked PNG export. Downloading high-res SVG instead.", 'warning');
-        triggerDownload(svgUrl, 'map_export.svg');
-      }
+        const scale = 4; const cvs = document.createElement('canvas'); const ctx = cvs.getContext('2d');
+        cvs.width = baseWidth * scale; cvs.height = baseHeight * scale;
+        ctx.fillStyle = isDarkMode ? "#0f172a" : "#f8fafc"; ctx.fillRect(0, 0, cvs.width, cvs.height);
+        ctx.scale(scale, scale); ctx.drawImage(img, 0, 0); 
+        triggerDownload(cvs.toDataURL('image/png'), 'map_export.png');
+      } catch (err) { triggerDownload(svgUrl, 'map_export.svg'); }
     };
-    
     img.onerror = () => { triggerDownload(svgUrl, 'map_export.svg'); };
     img.src = svgUrl;
   };
@@ -601,22 +471,17 @@ function MainApp() {
 
       {/* --- REBUILT RESPONSIVE HEADER --- */}
       <header className={`flex items-center justify-between px-4 md:px-6 py-3 md:py-4 border-b z-30 relative shadow-sm shrink-0 transition-colors duration-300 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
-        {/* LOGO */}
-        <div className="flex items-center space-x-2 md:space-x-3">
+        <div className="flex items-center space-x-2 md:space-x-3 cursor-pointer" onClick={() => { setStatus('idle'); window.history.pushState({}, '', '/'); }}>
           <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg flex items-center justify-center ${isDarkMode ? 'bg-indigo-500 text-white' : 'bg-slate-900 text-white'}`}><GitBranch size={18} strokeWidth={2.5} /></div>
           <div><h1 className="text-base md:text-lg font-bold">RepoVue</h1><p className="text-[9px] md:text-[10px] text-slate-500 font-bold uppercase tracking-widest hidden sm:block">Visualizer</p></div>
         </div>
 
-        {/* DESKTOP MIDDLE NAVIGATION */}
         <div className={`hidden lg:flex items-center p-1 rounded-full border mx-auto ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-200'}`}>
           <button onClick={() => setAppMode('developer')} className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${appMode === 'developer' ? (isDarkMode ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-indigo-600 shadow-sm') : 'text-slate-500 hover:text-slate-400'}`}>💻 Developer Mode</button>
           <button onClick={() => setAppMode('knowledge')} className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${appMode === 'knowledge' ? (isDarkMode ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-indigo-600 shadow-sm') : 'text-slate-500 hover:text-slate-400'}`}>🧠 Knowledge Mode</button>
         </div>
 
-        {/* RIGHT SIDE ALIGNMENT */}
         <div className="flex items-center space-x-2">
-          
-          {/* DESKTOP ONLY ACTIONS */}
           <div className="hidden lg:flex items-center space-x-2">
             <button onClick={() => setIsDarkMode(!isDarkMode)} className={`p-2 rounded-full font-medium transition-colors ${isDarkMode ? 'bg-slate-800 text-yellow-400 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
               {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
@@ -646,18 +511,15 @@ function MainApp() {
             <div className={`w-px h-6 mx-1 ${isDarkMode ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
           </div>
 
-          {/* ALWAYS VISIBLE BUTTONS */}
           <a href={TIP_JAR_LINK} target="_blank" rel="noopener noreferrer" className={`flex items-center p-2 sm:px-4 sm:py-2 rounded-full font-bold text-xs sm:text-sm ${isDarkMode ? 'bg-pink-950 text-pink-400' : 'bg-pink-50 text-pink-600'}`}><Heart size={16} className="fill-red-500" /><span className="hidden sm:inline sm:ml-2">Support</span></a>
           <SignedOut><SignInButton mode="modal"><button className={`px-3 py-2 sm:px-4 rounded-full font-bold text-xs sm:text-sm transition-colors ${isDarkMode ? 'bg-indigo-500 hover:bg-indigo-400 text-white' : 'bg-slate-900 text-white'}`}>Login</button></SignInButton></SignedOut>
           <SignedIn><UserButton afterSignOutUrl="/" /></SignedIn>
 
-          {/* MOBILE HAMBURGER MENU BUTTON */}
           <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className={`lg:hidden p-2 rounded-lg transition-colors ${isDarkMode ? 'text-white hover:bg-slate-800' : 'text-slate-900 hover:bg-slate-100'}`}>
             <Menu size={22} />
           </button>
         </div>
 
-        {/* MOBILE DROPDOWN MENU */}
         {mobileMenuOpen && (
           <div className={`absolute top-full left-0 w-full border-b shadow-xl p-4 flex flex-col space-y-3 z-50 lg:hidden animate-in slide-in-from-top-2 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
             <div className={`flex items-center p-1 rounded-xl border ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-100 border-slate-200'}`}>
@@ -691,8 +553,6 @@ function MainApp() {
               <div className={`w-full max-w-2xl mx-auto mt-4 mb-24 sm:mt-12 lg:mt-20 rounded-2xl md:rounded-[2rem] shadow-2xl border overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
                 <div className={`flex border-b ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
                   <button className={`flex-1 py-4 md:py-5 text-[10px] md:text-xs font-bold uppercase tracking-widest ${inputMode === 'url' ? (isDarkMode ? 'bg-slate-900 shadow-sm text-white' : 'bg-white shadow-sm text-slate-900') : 'text-slate-500'}`} onClick={() => setInputMode('url')}><Link size={14} className="inline mr-1" /> Web Links</button>
-                  
-                  {/* DYNAMIC TAB NAME */}
                   <button className={`flex-1 py-4 md:py-5 text-[10px] md:text-xs font-bold uppercase tracking-widest ${inputMode === 'local' ? (isDarkMode ? 'bg-slate-900 shadow-sm text-white' : 'bg-white shadow-sm text-slate-900') : 'text-slate-500'}`} onClick={() => setInputMode('local')}>
                     {appMode === 'developer' ? <Code size={14} className="inline mr-1" /> : <FileText size={14} className="inline mr-1" />}
                     {appMode === 'developer' ? 'Local Inputs' : 'Local Docs/Notes'}
@@ -707,22 +567,17 @@ function MainApp() {
                       <div className={`w-full border-2 border-dashed rounded-xl p-4 md:p-6 text-center transition-colors ${isDraggingOver ? (isDarkMode ? 'border-indigo-500 bg-indigo-900/30' : 'border-blue-500 bg-blue-50') : (isDarkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-300 bg-slate-50')}`} onDragOver={e=>{e.preventDefault(); setIsDraggingOver(true)}} onDragLeave={()=>setIsDraggingOver(false)} onDrop={e=>{e.preventDefault(); setIsDraggingOver(false); processFiles(e.dataTransfer.files);}}>
                         <Upload size={24} className="text-slate-400 mx-auto mb-3" />
                         <span className={`block text-xs md:text-sm font-bold mb-4 ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>Drag & Drop files or PDFs here</span>
-                        
                         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                           <input type="file" multiple className="hidden" id="file-upload" onChange={e => processFiles(e.target.files)} />
                           <label htmlFor="file-upload" className={`cursor-pointer px-4 py-2.5 rounded-xl text-xs font-bold border transition-all active:scale-95 w-full sm:w-auto ${isDarkMode ? 'bg-slate-800 border-slate-600 hover:bg-slate-700 text-white' : 'bg-white border-slate-300 hover:bg-slate-50 text-slate-700'}`}>Browse Files</label>
-                          
                           <input type="file" multiple webkitdirectory="true" className="hidden" id="folder-upload" onChange={e => processFiles(e.target.files)} />
                           <label htmlFor="folder-upload" className={`cursor-pointer px-4 py-2.5 rounded-xl text-xs font-bold border transition-all active:scale-95 w-full sm:w-auto ${isDarkMode ? 'bg-indigo-600 border-indigo-500 hover:bg-indigo-500 text-white' : 'bg-blue-50 border-blue-200 hover:bg-blue-100 text-blue-700'}`}>Browse Folder</label>
                         </div>
                       </div>
-
                       <div className="max-h-48 md:max-h-64 overflow-y-auto space-y-3 custom-scroll pr-2">
                         {localFiles.map((file) => (
                           <div key={file.id} className={`border rounded-xl flex flex-col overflow-hidden ${isDarkMode ? 'border-slate-700' : 'border-slate-200'}`}>
-                            {/* DYNAMIC FILENAME PLACEHOLDER */}
                             <div className={`flex px-3 py-2 border-b ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}><input type="text" value={file.name} onChange={e => setLocalFiles(p => p.map(f => f.id === file.id ? { ...f, name: e.target.value } : f))} className={`bg-transparent text-xs md:text-sm font-bold flex-1 outline-none ${isDarkMode ? 'text-white' : 'text-slate-900'}`} placeholder={appMode === 'developer' ? "filename.js" : "document.pdf"} /><button onClick={() => setLocalFiles(p => p.filter(f => f.id !== file.id))} className="text-slate-400 hover:text-red-500"><Trash2 size={14}/></button></div>
-                            {/* DYNAMIC TEXTAREA PLACEHOLDER */}
                             <textarea value={file.content} onChange={e => setLocalFiles(p => p.map(f => f.id === file.id ? { ...f, content: e.target.value } : f))} className={`w-full h-20 md:h-24 p-3 text-xs font-mono resize-none outline-none custom-scroll ${isDarkMode ? 'bg-slate-900 text-slate-300' : 'bg-white text-slate-800'}`} placeholder={appMode === 'developer' ? "// Paste code here..." : "Paste your text, notes, or wait for PDF extraction..."} />
                           </div>
                         ))}
@@ -730,7 +585,6 @@ function MainApp() {
                       <button onClick={() => setLocalFiles(p => [...p, { id: Date.now(), name: appMode === 'developer' ? `snippet_${p.length + 1}.js` : `note_${p.length + 1}.txt`, content: '' }])} className={`text-[10px] md:text-xs font-bold flex items-center ${isDarkMode ? 'text-indigo-400' : 'text-blue-600'}`}><Plus size={14} className="mr-1"/> Add Section</button>
                     </div>
                   )}
-
                   {inputError && <div className={`mt-4 p-3 rounded-lg text-xs md:text-sm font-medium flex items-center ${isDarkMode ? 'bg-red-900/30 text-red-400' : 'bg-red-50 text-red-700'}`}><AlertTriangle size={16} className="mr-2 shrink-0" />{inputError}</div>}
                   <button onClick={handleAnalyze} className={`mt-6 md:mt-8 w-full py-4 rounded-xl font-bold text-sm md:text-base shadow-lg transition-all active:scale-95 ${isDarkMode ? 'bg-indigo-600 hover:bg-indigo-500 text-white' : 'bg-slate-900 hover:bg-slate-800 text-white'}`}>Generate Architecture Map</button>
                 </div>
@@ -738,7 +592,6 @@ function MainApp() {
             </div>
           )}
 
-          {/* Loading / Error States */}
           {status !== 'idle' && status !== 'ready' && (
             <div className={`absolute inset-0 z-20 flex flex-col items-center justify-center p-4 overflow-y-auto ${isDarkMode ? 'bg-slate-950/80' : 'bg-white/80'} backdrop-blur-sm`}>
                {status === 'error' && errorData ? (
@@ -750,7 +603,7 @@ function MainApp() {
                       <b className="uppercase tracking-wider text-[10px] opacity-70 block mb-2">Tactical Bypass Options:</b>
                       <ol className="list-decimal list-inside space-y-1 ml-1">{errorData.steps.map((step, idx) => <li key={idx}>{step}</li>)}</ol>
                     </div>
-                    <button onClick={() => setStatus('idle')} className={`w-full py-3 text-white font-bold text-sm rounded-xl transition-all shadow-lg active:scale-95 ${isDarkMode ? 'bg-indigo-600 hover:bg-indigo-500' : errorData.styles.bgBtn + ' ' + errorData.styles.hover}`}>Return to Base</button>
+                    <button onClick={() => { setStatus('idle'); window.history.pushState({}, '', '/'); }} className={`w-full py-3 text-white font-bold text-sm rounded-xl transition-all shadow-lg active:scale-95 ${isDarkMode ? 'bg-indigo-600 hover:bg-indigo-500' : errorData.styles.bgBtn + ' ' + errorData.styles.hover}`}>Return to Base</button>
                  </div>
                ) : (
                  <div className={`text-center p-6 md:p-8 rounded-2xl shadow-xl border w-full max-w-xs animate-in fade-in ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
@@ -762,28 +615,24 @@ function MainApp() {
             </div>
           )}
 
-          {/* Map Controls */}
           {status === 'ready' && (
             <div className={`absolute bottom-4 right-4 z-10 flex space-x-1 p-1.5 rounded-xl shadow-lg border transition-colors ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
               <button onClick={() => setTransform(p => ({ ...p, scale: p.scale + 0.2 }))} className={`p-1.5 rounded-lg ${isDarkMode ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-slate-100 text-slate-700'}`}><ZoomIn size={16}/></button>
               <button onClick={() => setTransform(p => ({ ...p, scale: Math.max(0.1, p.scale - 0.2) }))} className={`p-1.5 rounded-lg ${isDarkMode ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-slate-100 text-slate-700'}`}><ZoomOut size={16}/></button>
               <button onClick={() => setTransform({ x: 0, y: 0, scale: 1 })} className={`p-1.5 rounded-lg ${isDarkMode ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-slate-100 text-slate-700'}`}><Maximize size={16}/></button>
-              
               <div className={`w-px h-5 mx-1 my-auto ${isDarkMode ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
-              
               <button onClick={() => setLayoutDir(layoutDir === 'TD' ? 'LR' : 'TD')} className={`p-1.5 rounded-lg font-bold text-[10px] flex items-center ${isDarkMode ? 'hover:bg-slate-800 text-indigo-400' : 'hover:bg-slate-100 text-blue-600'}`}>
                 {layoutDir === 'TD' ? <ArrowRightLeft size={16}/> : <ArrowDownUp size={16}/>}
               </button>
             </div>
           )}
 
-          {/* The Canvas */}
           <div className="w-full h-full origin-top-left cursor-grab active:cursor-grabbing flex items-center justify-center p-10 md:p-20 min-w-max min-h-max" style={{ transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})` }}>
             <div ref={mapContentRef} />
           </div>
         </div>
 
-        {/* Floating Sidebar - Node Details (Focus Panel) */}
+        {/* Note: The right sidebar is disabled if you are simply viewing a shared map without raw JSON architecture */}
         <div className={`absolute right-0 top-0 bottom-0 w-full sm:w-80 md:w-96 border-l shadow-2xl z-20 transition-transform duration-300 flex flex-col ${selectedNodeId ? 'translate-x-0' : 'translate-x-full'} ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
           {selectedNode && (
             <>
@@ -817,7 +666,6 @@ function MainApp() {
                   <textarea value={selectedNode.userComment || ''} onChange={e => handleNodeEdit(selectedNode.id, 'userComment', e.target.value)} placeholder="Type intel here..." className={`w-full h-16 p-2 border rounded-lg outline-none text-xs resize-none custom-scroll ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white focus:bg-slate-700 focus:border-slate-500' : 'bg-slate-50 border-slate-200 text-slate-900 focus:bg-white focus:border-slate-300'}`} />
                 </div>
                 
-                {/* DYNAMIC SIDEBAR SOURCE TEXT */}
                 <div>
                   <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center mb-1.5">
                     {appMode === 'developer' ? <Code size={12} className="mr-1.5"/> : <FileText size={12} className="mr-1.5"/>}
@@ -826,7 +674,6 @@ function MainApp() {
                   <pre className={`p-3 rounded-xl text-[10px] overflow-x-auto max-h-48 custom-scroll ${isDarkMode ? 'bg-black border border-slate-800 text-slate-300' : 'bg-slate-900 border-slate-700 text-slate-300'}`}><code>{selectedNode.code_snippet || (appMode === 'developer' ? 'No code provided' : 'No text provided')}</code></pre>
                 </div>
                 
-                {/* DYNAMIC ACTION BUTTON */}
                 <div className="pt-2 pb-6">
                   <button onClick={() => handleRefactor(selectedNode)} disabled={isRefactoring} className={`w-full py-2.5 rounded-xl text-xs font-semibold disabled:opacity-70 flex justify-center items-center shadow-md active:scale-95 ${isDarkMode ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-white'}`}>
                     {isRefactoring ? <Loader2 size={14} className="animate-spin mr-2"/> : <Zap size={14} className="mr-2 text-yellow-400 fill-yellow-400"/>} 
@@ -840,7 +687,6 @@ function MainApp() {
         </div>
       </div>
 
-      {/* --- VAULT SIDEBAR --- */}
       <div className={`fixed inset-y-0 left-0 w-full sm:w-80 border-r shadow-2xl z-40 transform transition-transform duration-300 flex flex-col ${historySidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
         <div className={`p-4 border-b flex justify-between items-center ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
           <h2 className="text-base font-bold flex items-center"><HardDrive size={18} className="mr-2 text-slate-500"/> Local Vault</h2>
@@ -867,15 +713,11 @@ function MainApp() {
       
       {historySidebarOpen && <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-30 animate-in fade-in" onClick={() => setHistorySidebarOpen(false)}></div>}
 
-      {/* --- SAAS FOOTER --- */}
       <footer className={`w-full border-t py-3 px-4 md:px-6 flex flex-col sm:flex-row items-center justify-between text-[10px] font-medium z-10 shrink-0 transition-colors duration-300 ${isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-500' : 'bg-white border-slate-200 text-slate-400'}`}>
-        <div className="mb-2 sm:mb-0">
-          © {new Date().getFullYear()} RepoVue Visualizer. All rights reserved.
-        </div>
+        <div className="mb-2 sm:mb-0">© {new Date().getFullYear()} RepoVue Visualizer. All rights reserved.</div>
         <div className="flex space-x-4">
           <a href="#" className={`transition-colors ${isDarkMode ? 'hover:text-slate-300' : 'hover:text-slate-700'}`}>Privacy Policy</a>
           <a href="#" className={`transition-colors ${isDarkMode ? 'hover:text-slate-300' : 'hover:text-slate-700'}`}>Terms of Service</a>
-          <a href="#" className={`transition-colors ${isDarkMode ? 'hover:text-slate-300' : 'hover:text-slate-700'}`}>Acceptable Use</a>
         </div>
       </footer>
 
@@ -894,10 +736,7 @@ class ErrorBoundary extends React.Component {
   static getDerivedStateFromError(error) { return { hasError: true, error }; }
   
   componentDidCatch(error, errorInfo) {
-    sendTelemetry('fatal_react_crash', { 
-      errorMessage: error.toString(),
-      stackTrace: errorInfo.componentStack?.substring(0, 500) || 'No stack trace provided'
-    });
+    sendTelemetry('fatal_react_crash', { errorMessage: error.toString(), stackTrace: errorInfo.componentStack?.substring(0, 500) || 'No stack trace provided' });
   }
 
   render() {
